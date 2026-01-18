@@ -191,6 +191,20 @@ T extract_arg_or(const json& args, const std::string& name, const T& default_val
     return default_val;
 }
 
+// Type trait to detect std::optional
+template<typename T>
+struct is_optional : std::false_type
+{
+};
+
+template<typename T>
+struct is_optional<std::optional<T>> : std::true_type
+{
+};
+
+template<typename T>
+inline constexpr bool is_optional_v = is_optional<T>::value;
+
 } // namespace detail
 
 // =============================================================================
@@ -407,7 +421,7 @@ class ToolBuilder::StructBuilder
         p.type_schema = detail::schema_type<FieldType>::schema();
 
         // Check if optional type
-        p.required = !is_optional_v<FieldType>;
+        p.required = !detail::is_optional_v<FieldType>;
 
         params_.push_back(std::move(p));
         return *this;
@@ -475,12 +489,6 @@ class ToolBuilder::StructBuilder
     }
 
   private:
-    template<typename T>
-    static constexpr bool is_optional_v = false;
-
-    template<typename T>
-    static constexpr bool is_optional_v<std::optional<T>> = true;
-
     json generate_schema() const
     {
         json props = json::object();
