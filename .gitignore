@@ -1,0 +1,21 @@
+build*/
+cmake-build*/
+out*/
+install*/
+Testing/
+
+# IDEs
+.vs/
+.idea/
+.vscode/
+
+# CMake single-directory generators
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+
+# OS
+Thumbs.db
+CLAUDE.md
+AGENTS.md
