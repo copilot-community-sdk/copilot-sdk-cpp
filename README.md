@@ -192,6 +192,12 @@ cmake --install build --config Release
 
 Want to add your project? Open a PR!
 
+## Author
+
+Elias Bachaalany ([@0xeb](https://github.com/0xeb))
+
+Pair-programmed with Claude Code and Codex.
+
 ## License
 
 Copyright 2025 Elias Bachaalany
