@@ -200,6 +200,31 @@ class Session : public std::enable_shared_from_this<Session>
     PermissionRequestResult handle_permission_request(const PermissionRequest& request);
 
     // =========================================================================
+    // User Input Handling
+    // =========================================================================
+
+    /// Register a handler for user input requests from the agent
+    /// @param handler Function to call for user input requests
+    void register_user_input_handler(UserInputHandler handler);
+
+    /// Handle a user input request (called by Client)
+    UserInputResponse handle_user_input_request(const UserInputRequest& request);
+
+    // =========================================================================
+    // Hooks
+    // =========================================================================
+
+    /// Register hook handlers for this session
+    /// @param hooks Hook handlers configuration
+    void register_hooks(SessionHooks hooks);
+
+    /// Handle a hook invocation from the server (called by Client)
+    /// @param hook_type The type of hook to invoke
+    /// @param input The hook input data as JSON
+    /// @return Hook output as JSON, or null JSON if no handler
+    json handle_hooks_invoke(const std::string& hook_type, const json& input);
+
+    // =========================================================================
     // Lifecycle
     // =========================================================================
 
@@ -223,6 +248,14 @@ class Session : public std::enable_shared_from_this<Session>
 
     // Permission handler
     PermissionHandler permission_handler_;
+
+    // User input handler
+    std::mutex user_input_mutex_;
+    UserInputHandler user_input_handler_;
+
+    // Hooks
+    std::mutex hooks_mutex_;
+    std::optional<SessionHooks> hooks_;
 };
 
 } // namespace copilot

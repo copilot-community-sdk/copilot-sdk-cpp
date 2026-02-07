@@ -54,3 +54,33 @@ set_target_properties(attachments PROPERTIES FOLDER "Examples")
 add_executable(fluent_tools fluent_tools.cpp)
 target_link_libraries(fluent_tools PRIVATE copilot_sdk_cpp)
 set_target_properties(fluent_tools PROPERTIES FOLDER "Examples")
+
+# Compaction events monitoring example
+add_executable(compaction_events compaction_events.cpp)
+target_link_libraries(compaction_events PRIVATE copilot_sdk_cpp)
+set_target_properties(compaction_events PROPERTIES FOLDER "Examples")
+
+# List models with vision capabilities example
+add_executable(list_models list_models.cpp)
+target_link_libraries(list_models PRIVATE copilot_sdk_cpp)
+set_target_properties(list_models PROPERTIES FOLDER "Examples")
+
+# Tool execution progress monitoring example
+add_executable(tool_progress tool_progress.cpp)
+target_link_libraries(tool_progress PRIVATE copilot_sdk_cpp)
+set_target_properties(tool_progress PROPERTIES FOLDER "Examples")
+
+# Hooks system example (v0.1.23)
+add_executable(hooks hooks.cpp)
+target_link_libraries(hooks PRIVATE copilot_sdk_cpp)
+set_target_properties(hooks PROPERTIES FOLDER "Examples")
+
+# User input handler example (v0.1.23)
+add_executable(user_input user_input.cpp)
+target_link_libraries(user_input PRIVATE copilot_sdk_cpp)
+set_target_properties(user_input PROPERTIES FOLDER "Examples")
+
+# Reasoning effort example (v0.1.23)
+add_executable(reasoning_effort reasoning_effort.cpp)
+target_link_libraries(reasoning_effort PRIVATE copilot_sdk_cpp)
+set_target_properties(reasoning_effort PROPERTIES FOLDER "Examples")

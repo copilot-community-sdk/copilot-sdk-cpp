@@ -42,6 +42,10 @@ struct ToolUserRequestedData;
 struct ToolExecutionStartData;
 struct ToolExecutionPartialResultData;
 struct ToolExecutionCompleteData;
+struct SessionCompactionStartData;
+struct SessionCompactionCompleteData;
+struct SessionUsageInfoData;
+struct ToolExecutionProgressData;
 struct CustomAgentStartedData;
 struct CustomAgentCompletedData;
 struct CustomAgentFailedData;
@@ -49,6 +53,9 @@ struct CustomAgentSelectedData;
 struct HookStartData;
 struct HookEndData;
 struct SystemMessageData;
+struct SessionSnapshotRewindData;
+struct SessionShutdownData;
+struct SkillInvokedData;
 
 // =============================================================================
 // Nested Types
@@ -73,7 +80,8 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
 enum class UserAttachmentType
 {
     File,
-    Directory
+    Directory,
+    Selection
 };
 
 NLOHMANN_JSON_SERIALIZE_ENUM(
@@ -81,6 +89,7 @@ NLOHMANN_JSON_SERIALIZE_ENUM(
     {
         {UserAttachmentType::File, "file"},
         {UserAttachmentType::Directory, "directory"},
+        {UserAttachmentType::Selection, "selection"},
     }
 )
 
@@ -169,16 +178,21 @@ inline void from_json(const json& j, ToolRequestItem& t)
 struct ToolResultContent
 {
     std::string content;
+    std::optional<std::string> detailed_content;
 };
 
 inline void to_json(json& j, const ToolResultContent& r)
 {
     j = json{{"content", r.content}};
+    if (r.detailed_content)
+        j["detailedContent"] = *r.detailed_content;
 }
 
 inline void from_json(const json& j, ToolResultContent& r)
 {
     j.at("content").get_to(r.content);
+    if (j.contains("detailedContent") && !j["detailedContent"].is_null())
+        r.detailed_content = j.at("detailedContent").get<std::string>();
 }
 
 /// Tool execution error
@@ -289,6 +303,8 @@ struct SessionErrorData
     std::string error_type;
     std::string message;
     std::optional<std::string> stack;
+    std::optional<double> status_code;
+    std::optional<std::string> provider_call_id;
 };
 
 inline void from_json(const json& j, SessionErrorData& d)
@@ -297,6 +313,10 @@ inline void from_json(const json& j, SessionErrorData& d)
     j.at("message").get_to(d.message);
     if (j.contains("stack"))
         d.stack = j.at("stack").get<std::string>();
+    if (j.contains("statusCode") && !j["statusCode"].is_null())
+        d.status_code = j.at("statusCode").get<double>();
+    if (j.contains("providerCallId") && !j["providerCallId"].is_null())
+        d.provider_call_id = j.at("providerCallId").get<std::string>();
 }
 
 struct SessionIdleData
@@ -458,6 +478,9 @@ struct AssistantMessageData
     std::optional<double> total_response_size_bytes;
     std::optional<std::vector<ToolRequestItem>> tool_requests;
     std::optional<std::string> parent_tool_call_id;
+    std::optional<std::string> reasoning_opaque;
+    std::optional<std::string> reasoning_text;
+    std::optional<std::string> encrypted_content;
 };
 
 inline void from_json(const json& j, AssistantMessageData& d)
@@ -472,6 +495,12 @@ inline void from_json(const json& j, AssistantMessageData& d)
         d.tool_requests = j.at("toolRequests").get<std::vector<ToolRequestItem>>();
     if (j.contains("parentToolCallId"))
         d.parent_tool_call_id = j.at("parentToolCallId").get<std::string>();
+    if (j.contains("reasoningOpaque") && !j["reasoningOpaque"].is_null())
+        d.reasoning_opaque = j.at("reasoningOpaque").get<std::string>();
+    if (j.contains("reasoningText") && !j["reasoningText"].is_null())
+        d.reasoning_text = j.at("reasoningText").get<std::string>();
+    if (j.contains("encryptedContent") && !j["encryptedContent"].is_null())
+        d.encrypted_content = j.at("encryptedContent").get<std::string>();
 }
 
 struct AssistantMessageDeltaData
@@ -515,6 +544,7 @@ struct AssistantUsageData
     std::optional<std::string> api_call_id;
     std::optional<std::string> provider_call_id;
     std::optional<std::map<std::string, json>> quota_snapshots;
+    std::optional<std::string> parent_tool_call_id;
 };
 
 inline void from_json(const json& j, AssistantUsageData& d)
@@ -541,6 +571,8 @@ inline void from_json(const json& j, AssistantUsageData& d)
         d.provider_call_id = j.at("providerCallId").get<std::string>();
     if (j.contains("quotaSnapshots"))
         d.quota_snapshots = j.at("quotaSnapshots").get<std::map<std::string, json>>();
+    if (j.contains("parentToolCallId") && !j["parentToolCallId"].is_null())
+        d.parent_tool_call_id = j.at("parentToolCallId").get<std::string>();
 }
 
 struct AbortData
@@ -574,6 +606,8 @@ struct ToolExecutionStartData
     std::string tool_name;
     std::optional<json> arguments;
     std::optional<std::string> parent_tool_call_id;
+    std::optional<std::string> mcp_server_name;
+    std::optional<std::string> mcp_tool_name;
 };
 
 inline void from_json(const json& j, ToolExecutionStartData& d)
@@ -584,6 +618,10 @@ inline void from_json(const json& j, ToolExecutionStartData& d)
         d.arguments = j.at("arguments");
     if (j.contains("parentToolCallId"))
         d.parent_tool_call_id = j.at("parentToolCallId").get<std::string>();
+    if (j.contains("mcpServerName") && !j["mcpServerName"].is_null())
+        d.mcp_server_name = j.at("mcpServerName").get<std::string>();
+    if (j.contains("mcpToolName") && !j["mcpToolName"].is_null())
+        d.mcp_tool_name = j.at("mcpToolName").get<std::string>();
 }
 
 struct ToolExecutionPartialResultData
@@ -623,6 +661,95 @@ inline void from_json(const json& j, ToolExecutionCompleteData& d)
         d.tool_telemetry = j.at("toolTelemetry").get<std::map<std::string, json>>();
     if (j.contains("parentToolCallId"))
         d.parent_tool_call_id = j.at("parentToolCallId").get<std::string>();
+}
+
+struct ToolExecutionProgressData
+{
+    std::string tool_call_id;
+    std::string progress_message;
+};
+
+inline void from_json(const json& j, ToolExecutionProgressData& d)
+{
+    j.at("toolCallId").get_to(d.tool_call_id);
+    j.at("progressMessage").get_to(d.progress_message);
+}
+
+struct SessionUsageInfoData
+{
+    double token_limit = 0;
+    double current_tokens = 0;
+    double messages_length = 0;
+};
+
+inline void from_json(const json& j, SessionUsageInfoData& d)
+{
+    j.at("tokenLimit").get_to(d.token_limit);
+    j.at("currentTokens").get_to(d.current_tokens);
+    j.at("messagesLength").get_to(d.messages_length);
+}
+
+struct SessionCompactionStartData
+{
+};
+
+inline void from_json(const json&, SessionCompactionStartData&) {}
+
+struct SessionCompactionCompleteDataTokensUsed
+{
+    double input = 0;
+    double output = 0;
+    double cached_input = 0;
+};
+
+inline void from_json(const json& j, SessionCompactionCompleteDataTokensUsed& d)
+{
+    j.at("input").get_to(d.input);
+    j.at("output").get_to(d.output);
+    j.at("cachedInput").get_to(d.cached_input);
+}
+
+struct SessionCompactionCompleteData
+{
+    bool success = false;
+    std::optional<std::string> error;
+    std::optional<double> pre_compaction_tokens;
+    std::optional<double> post_compaction_tokens;
+    std::optional<double> pre_compaction_messages_length;
+    std::optional<double> post_compaction_messages_length;
+    std::optional<SessionCompactionCompleteDataTokensUsed> compaction_tokens_used;
+    std::optional<double> messages_removed;
+    std::optional<double> tokens_removed;
+    std::optional<std::string> summary_content;
+    std::optional<double> checkpoint_number;
+    std::optional<std::string> checkpoint_path;
+};
+
+inline void from_json(const json& j, SessionCompactionCompleteData& d)
+{
+    j.at("success").get_to(d.success);
+    if (j.contains("error"))
+        d.error = j.at("error").get<std::string>();
+    if (j.contains("preCompactionTokens"))
+        d.pre_compaction_tokens = j.at("preCompactionTokens").get<double>();
+    if (j.contains("postCompactionTokens"))
+        d.post_compaction_tokens = j.at("postCompactionTokens").get<double>();
+    if (j.contains("preCompactionMessagesLength"))
+        d.pre_compaction_messages_length = j.at("preCompactionMessagesLength").get<double>();
+    if (j.contains("postCompactionMessagesLength"))
+        d.post_compaction_messages_length = j.at("postCompactionMessagesLength").get<double>();
+    if (j.contains("compactionTokensUsed"))
+        d.compaction_tokens_used = j.at("compactionTokensUsed").get<SessionCompactionCompleteDataTokensUsed>();
+    if (j.contains("messagesRemoved"))
+        d.messages_removed = j.at("messagesRemoved").get<double>();
+    if (j.contains("tokensRemoved"))
+        d.tokens_removed = j.at("tokensRemoved").get<double>();
+    if (j.contains("summaryContent") && !j["summaryContent"].is_null())
+        d.summary_content = j.at("summaryContent").get<std::string>();
+    if (j.contains("checkpointNumber") && !j["checkpointNumber"].is_null())
+        d.checkpoint_number = j.at("checkpointNumber").get<double>();
+    if (j.contains("checkpointPath") && !j["checkpointPath"].is_null())
+        d.checkpoint_path = j.at("checkpointPath").get<std::string>();
 }
 
 struct CustomAgentStartedData
@@ -735,6 +862,100 @@ inline void from_json(const json& j, SystemMessageData& d)
 }
 
 // =============================================================================
+// New Event Data Types (v0.1.23)
+// =============================================================================
+
+/// Shutdown type enum
+enum class ShutdownType
+{
+    Routine,
+    Error
+};
+
+NLOHMANN_JSON_SERIALIZE_ENUM(
+    ShutdownType,
+    {
+        {ShutdownType::Routine, "routine"},
+        {ShutdownType::Error, "error"},
+    }
+)
+
+/// Code changes summary in shutdown data
+struct ShutdownCodeChanges
+{
+    double lines_added = 0;
+    double lines_removed = 0;
+    std::vector<std::string> files_modified;
+};
+
+inline void from_json(const json& j, ShutdownCodeChanges& d)
+{
+    j.at("linesAdded").get_to(d.lines_added);
+    j.at("linesRemoved").get_to(d.lines_removed);
+    if (j.contains("filesModified"))
+        j.at("filesModified").get_to(d.files_modified);
+}
+
+/// Data for session.snapshot_rewind event
+struct SessionSnapshotRewindData
+{
+    std::string up_to_event_id;
+    double events_removed = 0;
+};
+
+inline void from_json(const json& j, SessionSnapshotRewindData& d)
+{
+    j.at("upToEventId").get_to(d.up_to_event_id);
+    j.at("eventsRemoved").get_to(d.events_removed);
+}
+
+/// Data for session.shutdown event
+struct SessionShutdownData
+{
+    ShutdownType shutdown_type = ShutdownType::Routine;
+    std::optional<std::string> error_reason;
+    double total_premium_requests = 0;
+    double total_api_duration_ms = 0;
+    double session_start_time = 0;
+    ShutdownCodeChanges code_changes;
+    std::map<std::string, json> model_metrics;
+    std::optional<std::string> current_model;
+};
+
+inline void from_json(const json& j, SessionShutdownData& d)
+{
+    j.at("shutdownType").get_to(d.shutdown_type);
+    if (j.contains("errorReason") && !j["errorReason"].is_null())
+        d.error_reason = j.at("errorReason").get<std::string>();
+    j.at("totalPremiumRequests").get_to(d.total_premium_requests);
+    j.at("totalApiDurationMs").get_to(d.total_api_duration_ms);
+    j.at("sessionStartTime").get_to(d.session_start_time);
+    j.at("codeChanges").get_to(d.code_changes);
+    if (j.contains("modelMetrics"))
+        d.model_metrics = j.at("modelMetrics").get<std::map<std::string, json>>();
+    if (j.contains("currentModel") && !j["currentModel"].is_null())
+        d.current_model = j.at("currentModel").get<std::string>();
+}
+
+/// Data for skill.invoked event
+struct SkillInvokedData
+{
+    std::string name;
+    std::string path;
+    std::string content;
+    std::optional<std::vector<std::string>> allowed_tools;
+};
+
+inline void from_json(const json& j, SkillInvokedData& d)
+{
+    j.at("name").get_to(d.name);
+    j.at("path").get_to(d.path);
+    j.at("content").get_to(d.content);
+    if (j.contains("allowedTools") && !j["allowedTools"].is_null())
+        d.allowed_tools = j.at("allowedTools").get<std::vector<std::string>>();
+}
+
+// =============================================================================
 // Session Event Type (Discriminated Union)
 // =============================================================================
 
@@ -764,6 +985,10 @@ enum class SessionEventType
     ToolExecutionStart,
     ToolExecutionPartialResult,
     ToolExecutionComplete,
+    ToolExecutionProgress,
+    SessionCompactionStart,
+    SessionCompactionComplete,
+    SessionUsageInfo,
     CustomAgentStarted,
     CustomAgentCompleted,
     CustomAgentFailed,
@@ -771,6 +996,9 @@ enum class SessionEventType
     HookStart,
     HookEnd,
     SystemMessage,
+    SessionSnapshotRewind,
+    SessionShutdown,
+    SkillInvoked,
     Unknown
 };
 
@@ -799,6 +1027,10 @@ using SessionEventData = std::variant<
     ToolExecutionStartData,
     ToolExecutionPartialResultData,
     ToolExecutionCompleteData,
+    ToolExecutionProgressData,
+    SessionCompactionStartData,
+    SessionCompactionCompleteData,
+    SessionUsageInfoData,
     CustomAgentStartedData,
     CustomAgentCompletedData,
     CustomAgentFailedData,
@@ -806,6 +1038,9 @@ using SessionEventData = std::variant<
     HookStartData,
     HookEndData,
     SystemMessageData,
+    SessionSnapshotRewindData,
+    SessionShutdownData,
+    SkillInvokedData,
     json // Unknown event fallback
     >;
 
@@ -884,13 +1119,24 @@ inline SessionEvent parse_session_event(const json& j)
         {"tool.execution_start", SessionEventType::ToolExecutionStart},
         {"tool.execution_partial_result", SessionEventType::ToolExecutionPartialResult},
         {"tool.execution_complete", SessionEventType::ToolExecutionComplete},
-        {"custom_agent.started", SessionEventType::CustomAgentStarted},
-        {"custom_agent.completed", SessionEventType::CustomAgentCompleted},
-        {"custom_agent.failed", SessionEventType::CustomAgentFailed},
-        {"custom_agent.selected", SessionEventType::CustomAgentSelected},
+        {"tool.execution_progress", SessionEventType::ToolExecutionProgress},
+        {"session.compaction_start", SessionEventType::SessionCompactionStart},
+        {"session.compaction_complete", SessionEventType::SessionCompactionComplete},
+        {"session.usage_info", SessionEventType::SessionUsageInfo},
+        {"subagent.started", SessionEventType::CustomAgentStarted},
+        {"subagent.completed", SessionEventType::CustomAgentCompleted},
+        {"subagent.failed", SessionEventType::CustomAgentFailed},
+        {"subagent.selected", SessionEventType::CustomAgentSelected},
+        {"custom_agent.started", SessionEventType::CustomAgentStarted},   // legacy alias
+        {"custom_agent.completed", SessionEventType::CustomAgentCompleted}, // legacy alias
+        {"custom_agent.failed", SessionEventType::CustomAgentFailed},     // legacy alias
+        {"custom_agent.selected", SessionEventType::CustomAgentSelected}, // legacy alias
         {"hook.start", SessionEventType::HookStart},
         {"hook.end", SessionEventType::HookEnd},
         {"system.message", SessionEventType::SystemMessage},
+        {"session.snapshot_rewind", SessionEventType::SessionSnapshotRewind},
+        {"session.shutdown", SessionEventType::SessionShutdown},
+        {"skill.invoked", SessionEventType::SkillInvoked},
     };
 
     auto it = type_map.find(event.type_string);
@@ -970,6 +1216,18 @@ inline SessionEvent parse_session_event(const json& j)
         case SessionEventType::ToolExecutionComplete:
             event.data = data_json.get<ToolExecutionCompleteData>();
             break;
+        case SessionEventType::ToolExecutionProgress:
+            event.data = data_json.get<ToolExecutionProgressData>();
+            break;
+        case SessionEventType::SessionCompactionStart:
+            event.data = data_json.get<SessionCompactionStartData>();
+            break;
+        case SessionEventType::SessionCompactionComplete:
+            event.data = data_json.get<SessionCompactionCompleteData>();
+            break;
+        case SessionEventType::SessionUsageInfo:
+            event.data = data_json.get<SessionUsageInfoData>();
+            break;
         case SessionEventType::CustomAgentStarted:
             event.data = data_json.get<CustomAgentStartedData>();
             break;
@@ -990,6 +1248,15 @@ inline SessionEvent parse_session_event(const json& j)
             break;
         case SessionEventType::SystemMessage:
             event.data = data_json.get<SystemMessageData>();
+            break;
+        case SessionEventType::SessionSnapshotRewind:
+            event.data = data_json.get<SessionSnapshotRewindData>();
+            break;
+        case SessionEventType::SessionShutdown:
+            event.data = data_json.get<SessionShutdownData>();
+            break;
+        case SessionEventType::SkillInvoked:
+            event.data = data_json.get<SkillInvokedData>();
             break;
         default:
             event.data = data_json; // Fallback to raw JSON

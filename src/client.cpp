@@ -95,6 +95,14 @@ json build_session_create_request(const SessionConfig& config)
         request["infiniteSessions"] = *config.infinite_sessions;
     if (config.config_dir.has_value())
         request["configDir"] = *config.config_dir;
+    if (config.reasoning_effort.has_value())
+        request["reasoningEffort"] = *config.reasoning_effort;
+    if (config.on_user_input_request.has_value())
+        request["requestUserInput"] = true;
+    if (config.hooks.has_value() && config.hooks->has_any())
+        request["hooks"] = true;
+    if (config.working_directory.has_value())
+        request["workingDirectory"] = *config.working_directory;
 
     return request;
 }
@@ -151,6 +159,38 @@ json build_session_resume_request(const std::string& session_id, const ResumeSes
     if (config.config_dir.has_value())
         request["configDir"] = *config.config_dir;
 
+    // New fields for v0.1.23 parity
+    if (config.model.has_value())
+        request["model"] = *config.model;
+    if (config.reasoning_effort.has_value())
+        request["reasoningEffort"] = *config.reasoning_effort;
+    if (config.system_message.has_value())
+    {
+        json sys_msg;
+        if (config.system_message->content.has_value())
+            sys_msg["content"] = *config.system_message->content;
+        if (config.system_message->mode.has_value())
+        {
+            sys_msg["mode"] =
+                (*config.system_message->mode == SystemMessageMode::Replace) ? "replace" : "append";
+        }
+        request["systemMessage"] = sys_msg;
+    }
+    if (config.available_tools.has_value())
+        request["availableTools"] = *config.available_tools;
+    if (config.excluded_tools.has_value())
+        request["excludedTools"] = *config.excluded_tools;
+    if (config.working_directory.has_value())
+        request["workingDirectory"] = *config.working_directory;
+    if (config.disable_resume)
+        request["disableResume"] = true;
+    if (config.infinite_sessions.has_value())
+        request["infiniteSessions"] = *config.infinite_sessions;
+    if (config.on_user_input_request.has_value())
+        request["requestUserInput"] = true;
+    if (config.hooks.has_value() && config.hooks->has_any())
+        request["hooks"] = true;
+
     return request;
 }
 
@@ -163,6 +203,19 @@ Client::Client(ClientOptions options) : options_(std::move(options))
     // Validate mutually exclusive options
     if (options_.cli_url.has_value() && (options_.use_stdio || options_.cli_path.has_value()))
         throw std::invalid_argument("cli_url is mutually exclusive with use_stdio and cli_path");
+
+    // Validate auth options with external server
+    if (options_.cli_url.has_value())
+    {
+        if (options_.github_token.has_value())
+            throw std::invalid_argument(
+                "github_token cannot be used with cli_url "
+                "(external server manages its own auth)");
+        if (options_.use_logged_in_user.has_value())
+            throw std::invalid_argument(
+                "use_logged_in_user cannot be used with cli_url "
+                "(external server manages its own auth)");
+    }
 
     // Parse CLI URL if provided
     if (options_.cli_url.has_value())
@@ -289,6 +342,12 @@ std::future<void> Client::stop()
             }
             sessions_.clear();
 
+            // Clear models cache
+            {
+                std::lock_guard<std::mutex> cache_lock(models_cache_mutex_);
+                models_cache_.reset();
+            }
+
             // Stop process FIRST - this closes the pipe ends and unblocks reads
             if (process_)
             {
@@ -321,6 +380,12 @@ void Client::force_stop()
     std::lock_guard<std::mutex> lock(mutex_);
 
     sessions_.clear();
+
+    // Clear models cache
+    {
+        std::lock_guard<std::mutex> cache_lock(models_cache_mutex_);
+        models_cache_.reset();
+    }
 
     // Kill process FIRST - this closes the pipe ends and unblocks reads
     if (process_)
@@ -503,6 +568,10 @@ void Client::connect_to_server()
                 return handle_tool_call(params);
             else if (method == "permission.request")
                 return handle_permission_request(params);
+            else if (method == "userInput.request")
+                return handle_user_input_request(params);
+            else if (method == "hooks.invoke")
+                return handle_hooks_invoke(params);
             throw JsonRpcError(JsonRpcErrorCode::MethodNotFound, "Unknown method: " + method);
         }
     );
@@ -572,6 +641,14 @@ std::future<std::shared_ptr<Session>> Client::create_session(SessionConfig confi
             if (config.on_permission_request.has_value())
                 session->register_permission_handler(*config.on_permission_request);
 
+            // Register user input handler locally (server will call userInput.request)
+            if (config.on_user_input_request.has_value())
+                session->register_user_input_handler(*config.on_user_input_request);
+
+            // Register hooks locally (server will call hooks.invoke)
+            if (config.hooks.has_value())
+                session->register_hooks(*config.hooks);
+
             std::lock_guard<std::mutex> lock(mutex_);
             sessions_[session_id] = session;
 
@@ -615,6 +692,14 @@ Client::resume_session(const std::string& session_id, ResumeSessionConfig config
             // Register permission handler locally (server will call permission.request)
             if (config.on_permission_request.has_value())
                 session->register_permission_handler(*config.on_permission_request);
+
+            // Register user input handler locally (server will call userInput.request)
+            if (config.on_user_input_request.has_value())
+                session->register_user_input_handler(*config.on_user_input_request);
+
+            // Register hooks locally (server will call hooks.invoke)
+            if (config.hooks.has_value())
+                session->register_hooks(*config.hooks);
 
             std::lock_guard<std::mutex> lock(mutex_);
             sessions_[returned_session_id] = session;
@@ -792,14 +877,23 @@ std::future<std::vector<ModelInfo>> Client::list_models()
                     throw std::runtime_error("Client not connected. Call start() first.");
             }
 
-            auto response = rpc_->invoke("models.list", json::object()).get();
-            std::vector<ModelInfo> models;
-            if (response.contains("models") && response["models"].is_array())
+            // Check cache
             {
-                for (const auto& m : response["models"])
-                    models.push_back(m.get<ModelInfo>());
+                std::lock_guard<std::mutex> lock(models_cache_mutex_);
+                if (models_cache_.has_value())
+                    return std::vector<ModelInfo>(*models_cache_);
             }
-            return models;
+
+            auto response = rpc_->invoke("models.list", json::object()).get();
+            auto models_response = response.get<GetModelsResponse>();
+
+            // Store in cache
+            {
+                std::lock_guard<std::mutex> lock(models_cache_mutex_);
+                models_cache_ = models_response.models;
+            }
+
+            return models_response.models;
         }
     );
 }
@@ -927,6 +1021,60 @@ json Client::handle_permission_request(const json& params)
         return json{
             {"result", {{"kind", "denied-no-approval-rule-and-could-not-request-from-user"}}}
         };
+    }
+}
+
+json Client::handle_user_input_request(const json& params)
+{
+    std::string session_id = params["sessionId"].get<std::string>();
+    std::string question = params["question"].get<std::string>();
+
+    auto session = get_session(session_id);
+    if (!session)
+        throw JsonRpcError(JsonRpcErrorCode::InvalidParams, "Unknown session " + session_id);
+
+    try
+    {
+        UserInputRequest request;
+        request.question = question;
+        if (params.contains("choices") && !params["choices"].is_null())
+            request.choices = params["choices"].get<std::vector<std::string>>();
+        if (params.contains("allowFreeform") && !params["allowFreeform"].is_null())
+            request.allow_freeform = params["allowFreeform"].get<bool>();
+
+        auto result = session->handle_user_input_request(request);
+
+        json response;
+        response["answer"] = result.answer;
+        response["wasFreeform"] = result.was_freeform;
+        return response;
+    }
+    catch (const std::exception& e)
+    {
+        throw JsonRpcError(JsonRpcErrorCode::InternalError, e.what());
+    }
+}
+
+json Client::handle_hooks_invoke(const json& params)
+{
+    std::string session_id = params["sessionId"].get<std::string>();
+    std::string hook_type = params["hookType"].get<std::string>();
+    json input = params.value("input", json::object());
+
+    auto session = get_session(session_id);
+    if (!session)
+        throw JsonRpcError(JsonRpcErrorCode::InvalidParams, "Unknown session " + session_id);
+
+    try
+    {
+        auto output = session->handle_hooks_invoke(hook_type, input);
+        json response;
+        response["output"] = output;
+        return response;
+    }
+    catch (const std::exception& e)
+    {
+        throw JsonRpcError(JsonRpcErrorCode::InternalError, e.what());
     }
 }
 
