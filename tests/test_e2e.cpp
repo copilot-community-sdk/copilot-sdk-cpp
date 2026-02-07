@@ -379,11 +379,9 @@ TEST_F(E2ETest, CreateSessionWithModel)
 
 TEST_F(E2ETest, CreateSessionWithTools)
 {
-    test_info("Tool execution test: Register custom tool, ask AI to use it, verify tool called with correct args.");
-
     if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support tool calling";
-
+        GTEST_SKIP() << "BYOK model does not support tool calling";
+    test_info("Tool execution test: Register custom tool, ask AI to use it, verify tool called with correct args.");
     auto client = create_client();
     client->start().get();
 
@@ -605,11 +603,9 @@ TEST_F(E2ETest, SendMessage)
 
 TEST_F(E2ETest, StreamingResponse)
 {
-    test_info("Streaming response: Enable streaming, send prompt, verify multiple AssistantMessageDelta events.");
-
     if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support streaming deltas";
-
+        GTEST_SKIP() << "BYOK model does not support streaming deltas";
+    test_info("Streaming response: Enable streaming, send prompt, verify multiple AssistantMessageDelta events.");
     auto client = create_client();
     client->start().get();
 
@@ -816,12 +812,11 @@ TEST_F(E2ETest, ResumeSession)
 
 TEST_F(E2ETest, ResumeSessionWithTools)
 {
+    if (is_byok_active())
+        GTEST_SKIP() << "BYOK model does not support tool calling";
     test_info("Resume with tools: Create session, stop, resume with new tool, invoke tool successfully.");
 
     // BYOK/OpenAI doesn't support resuming sessions with new tools
-    if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers don't support resume_session with tools";
-
     auto client = create_client();
     client->start().get();
 
@@ -1702,11 +1697,9 @@ TEST_F(E2ETest, SystemMessageReplaceMode)
 
 TEST_F(E2ETest, MessageWithFileAttachment)
 {
-    test_info("File attachment: Attach temp file to message, verify AI reads file content.");
-
     if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support file attachments";
-
+        GTEST_SKIP() << "BYOK model does not support file attachments";
+    test_info("File attachment: Attach temp file to message, verify AI reads file content.");
     auto client = create_client();
     client->start().get();
 
@@ -1777,11 +1770,9 @@ TEST_F(E2ETest, MessageWithFileAttachment)
 
 TEST_F(E2ETest, MessageWithMultipleAttachments)
 {
-    test_info("Multiple attachments: Attach two files, verify AI references content from both.");
-
     if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support file attachments";
-
+        GTEST_SKIP() << "BYOK model does not support file attachments";
+    test_info("Multiple attachments: Attach two files, verify AI references content from both.");
     auto client = create_client();
     client->start().get();
 
@@ -1864,11 +1855,9 @@ TEST_F(E2ETest, MessageWithMultipleAttachments)
 
 TEST_F(E2ETest, ToolCallIdIsPropagated)
 {
-    test_info("Tool call ID propagation: Verify tool_call_id is passed to handler and matches events.");
-
     if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support tool calling";
-
+        GTEST_SKIP() << "BYOK model does not support tool calling";
+    test_info("Tool call ID propagation: Verify tool_call_id is passed to handler and matches events.");
     auto client = create_client();
     client->start().get();
 
@@ -2055,12 +2044,11 @@ TEST_F(E2ETest, ResumeSessionWithPermissionCallback)
 
 TEST_F(E2ETest, ResumeSessionWithToolsAndPermissions)
 {
+    if (is_byok_active())
+        GTEST_SKIP() << "BYOK model does not support tool calling";
     test_info("Resume with tools+perms: Resume with both tools and permission callback, invoke tool.");
 
     // BYOK/OpenAI doesn't support resuming sessions with new tools
-    if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers don't support resume_session with tools";
-
     auto client = create_client();
     client->start().get();
 
@@ -2248,11 +2236,9 @@ TEST_F(E2ETest, PermissionDenialWithMessage)
 
 TEST_F(E2ETest, FluentToolBuilderIntegration)
 {
-    test_info("Fluent ToolBuilder: Use ToolBuilder API for calc+echo tools, verify both work.");
-
     if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support tool calling";
-
+        GTEST_SKIP() << "BYOK model does not support tool calling";
+    test_info("Fluent ToolBuilder: Use ToolBuilder API for calc+echo tools, verify both work.");
     auto client = create_client();
     client->start().get();
 
@@ -2794,10 +2780,6 @@ TEST_F(E2ETest, ListModelsWithVisionCapabilities)
 TEST_F(E2ETest, SessionWithHooksConfigCreatesSuccessfully)
 {
     test_info("Hooks config: Create session with hooks configured, verify session starts.");
-
-    if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support hooks";
-
     auto client = create_client();
     client->start().get();
 
@@ -2838,11 +2820,9 @@ TEST_F(E2ETest, SessionWithHooksConfigCreatesSuccessfully)
 
 TEST_F(E2ETest, PreToolUseHookInvokedOnToolCall)
 {
-    test_info("Pre-tool-use hook: Register preToolUse hook with a tool, verify hook fires.");
-
     if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support tool calling + hooks";
-
+        GTEST_SKIP() << "BYOK model does not support tool calling";
+    test_info("Pre-tool-use hook: Register preToolUse hook with a tool, verify hook fires.");
     auto client = create_client();
     client->start().get();
 
@@ -2928,11 +2908,9 @@ TEST_F(E2ETest, PreToolUseHookInvokedOnToolCall)
 
 TEST_F(E2ETest, PreToolUseHookDeniesToolExecution)
 {
-    test_info("Hook deny: preToolUse hook denies tool execution via decision='deny'.");
-
     if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support tool calling + hooks";
-
+        GTEST_SKIP() << "BYOK model does not support tool calling";
+    test_info("Hook deny: preToolUse hook denies tool execution via decision='deny'.");
     auto client = create_client();
     client->start().get();
 
@@ -2940,16 +2918,21 @@ TEST_F(E2ETest, PreToolUseHookDeniesToolExecution)
     std::atomic<bool> tool_called{false};
 
     auto config = default_session_config();
-
-    Tool forbidden_tool;
-    forbidden_tool.name = "forbidden_action";
-    forbidden_tool.description = "An action that should be denied";
-    forbidden_tool.parameters_schema = {
-        {"type", "object"},
-        {"properties", {{"action", {{"type", "string"}, {"description", "What to do"}}}}},
-        {"required", {"action"}}
+    config.system_message = SystemMessageConfig{
+        SystemMessageMode::Append,
+        "IMPORTANT: You MUST call available tools whenever the user mentions them. "
+        "Never respond with text if a matching tool exists. Always invoke the tool first."
     };
-    forbidden_tool.handler = [&](const ToolInvocation&) -> ToolResultObject
+
+    Tool denied_tool;
+    denied_tool.name = "echo_test";
+    denied_tool.description = "Echo a message back. You MUST call this tool whenever the user asks you to echo something.";
+    denied_tool.parameters_schema = {
+        {"type", "object"},
+        {"properties", {{"message", {{"type", "string"}, {"description", "Message to echo"}}}}},
+        {"required", {"message"}}
+    };
+    denied_tool.handler = [&](const ToolInvocation&) -> ToolResultObject
     {
         tool_called = true;
         ToolResultObject result;
@@ -2957,7 +2940,7 @@ TEST_F(E2ETest, PreToolUseHookDeniesToolExecution)
         result.result_type = "success";
         return result;
     };
-    config.tools = {forbidden_tool};
+    config.tools = {denied_tool};
 
     config.hooks = SessionHooks{};
     config.hooks->on_pre_tool_use = [&](const PreToolUseHookInput&, const HookInvocation&)
@@ -2994,16 +2977,26 @@ TEST_F(E2ETest, PreToolUseHookDeniesToolExecution)
         }
     );
 
-    MessageOptions opts;
-    opts.prompt = "Use the forbidden_action tool with action 'test'.";
-    session->send(opts).get();
-
+    // Retry up to 3 times — model may not always call the tool on first attempt
+    const char* prompts[] = {
+        "Use the echo_test tool to echo 'hello'.",
+        "Please use echo_test to echo 'test message'.",
+        "Call echo_test with message='final try'."
+    };
+    for (int attempt = 0; attempt < 3 && !hook_called.load(); ++attempt)
     {
-        std::unique_lock<std::mutex> lock(mtx);
-        cv.wait_for(lock, std::chrono::seconds(60), [&]() { return idle.load(); });
+        idle = false;
+        MessageOptions opts;
+        opts.prompt = prompts[attempt];
+        session->send(opts).get();
+
+        {
+            std::unique_lock<std::mutex> lock(mtx);
+            cv.wait_for(lock, std::chrono::seconds(30), [&]() { return idle.load(); });
+        }
     }
 
-    EXPECT_TRUE(hook_called.load()) << "preToolUse hook should have been invoked";
+    EXPECT_TRUE(hook_called.load()) << "preToolUse hook should have been invoked (tried 3 prompts)";
     EXPECT_FALSE(tool_called.load()) << "Tool should NOT have been called when hook denies";
 
     session->destroy().get();
@@ -3012,11 +3005,9 @@ TEST_F(E2ETest, PreToolUseHookDeniesToolExecution)
 
 TEST_F(E2ETest, PostToolUseHookInvokedAfterToolExecution)
 {
-    test_info("Post-tool-use hook: Register postToolUse hook, verify fires after tool runs.");
-
     if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support tool calling + hooks";
-
+        GTEST_SKIP() << "BYOK model does not support tool calling";
+    test_info("Post-tool-use hook: Register postToolUse hook, verify fires after tool runs.");
     auto client = create_client();
     client->start().get();
 
@@ -3118,10 +3109,6 @@ TEST_F(E2ETest, PostToolUseHookInvokedAfterToolExecution)
 TEST_F(E2ETest, SessionWithUserInputHandlerCreates)
 {
     test_info("User input handler: Create session with user input handler, verify config accepted.");
-
-    if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support user input requests";
-
     auto client = create_client();
     client->start().get();
 
@@ -3149,11 +3136,9 @@ TEST_F(E2ETest, SessionWithUserInputHandlerCreates)
 
 TEST_F(E2ETest, SessionWithReasoningEffort)
 {
-    test_info("Reasoning effort: Create session with reasoning effort set, verify it's accepted.");
-
     if (is_byok_active())
         GTEST_SKIP() << "BYOK model does not support reasoning effort";
-
+    test_info("Reasoning effort: Create session with reasoning effort set, verify it's accepted.");
     auto client = create_client();
     client->start().get();
 
@@ -3411,11 +3396,9 @@ TEST_F(E2ETest, SessionWithWorkingDirectory)
 
 TEST_F(E2ETest, ResumeSessionWithNewConfigFields)
 {
-    test_info("Resume with new fields: Create session, then resume with v0.1.23 config fields.");
-
     if (is_byok_active())
         GTEST_SKIP() << "BYOK model does not support reasoning effort";
-
+    test_info("Resume with new fields: Create session, then resume with v0.1.23 config fields.");
     auto client = create_client();
     client->start().get();
 
@@ -3505,11 +3488,9 @@ TEST_F(E2ETest, ModelInfoReasoningEffortFields)
 
 TEST_F(E2ETest, FullFeaturedSessionWithAllNewConfig)
 {
-    test_info("Full config: Create session with all v0.1.23 features combined.");
-
     if (is_byok_active())
-        GTEST_SKIP() << "Skipping: BYOK providers may not support all v0.1.23 features";
-
+        GTEST_SKIP() << "BYOK model does not support tool calling";
+    test_info("Full config: Create session with all v0.1.23 features combined.");
     auto client = create_client();
     client->start().get();
 
