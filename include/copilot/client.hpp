@@ -195,6 +195,12 @@ class Client
     /// Handle incoming permission requests
     json handle_permission_request(const json& params);
 
+    /// Handle incoming user input requests
+    json handle_user_input_request(const json& params);
+
+    /// Handle incoming hook invocations
+    json handle_hooks_invoke(const json& params);
+
     // Options
     ClientOptions options_;
     std::optional<std::string> parsed_host_;
@@ -211,6 +217,10 @@ class Client
 
     // Sessions
     std::map<std::string, std::shared_ptr<Session>> sessions_;
+
+    // Models cache
+    mutable std::mutex models_cache_mutex_;
+    std::optional<std::vector<ModelInfo>> models_cache_;
 };
 
 } // namespace copilot

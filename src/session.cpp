@@ -249,6 +249,126 @@ PermissionRequestResult Session::handle_permission_request(const PermissionReque
 }
 
 // =============================================================================
+// User Input Handling
+// =============================================================================
+
+void Session::register_user_input_handler(UserInputHandler handler)
+{
+    std::lock_guard<std::mutex> lock(user_input_mutex_);
+    user_input_handler_ = std::move(handler);
+}
+
+UserInputResponse Session::handle_user_input_request(const UserInputRequest& request)
+{
+    UserInputHandler handler;
+    {
+        std::lock_guard<std::mutex> lock(user_input_mutex_);
+        handler = user_input_handler_;
+    }
+
+    if (!handler)
+        throw std::runtime_error("No user input handler registered");
+
+    UserInputInvocation invocation;
+    invocation.session_id = session_id_;
+    return handler(request, invocation);
+}
+
+// =============================================================================
+// Hooks
+// =============================================================================
+
+void Session::register_hooks(SessionHooks hooks)
+{
+    std::lock_guard<std::mutex> lock(hooks_mutex_);
+    hooks_ = std::move(hooks);
+}
+
+json Session::handle_hooks_invoke(const std::string& hook_type, const json& input)
+{
+    std::optional<SessionHooks> hooks;
+    {
+        std::lock_guard<std::mutex> lock(hooks_mutex_);
+        hooks = hooks_;
+    }
+
+    if (!hooks)
+        return nullptr;
+
+    HookInvocation invocation;
+    invocation.session_id = session_id_;
+
+    if (hook_type == "preToolUse" && hooks->on_pre_tool_use)
+    {
+        auto result = (*hooks->on_pre_tool_use)(input.get<PreToolUseHookInput>(), invocation);
+        if (result)
+        {
+            json output;
+            to_json(output, *result);
+            return output;
+        }
+        return nullptr;
+    }
+    else if (hook_type == "postToolUse" && hooks->on_post_tool_use)
+    {
+        auto result = (*hooks->on_post_tool_use)(input.get<PostToolUseHookInput>(), invocation);
+        if (result)
+        {
+            json output;
+            to_json(output, *result);
+            return output;
+        }
+        return nullptr;
+    }
+    else if (hook_type == "userPromptSubmitted" && hooks->on_user_prompt_submitted)
+    {
+        auto result = (*hooks->on_user_prompt_submitted)(input.get<UserPromptSubmittedHookInput>(), invocation);
+        if (result)
+        {
+            json output;
+            to_json(output, *result);
+            return output;
+        }
+        return nullptr;
+    }
+    else if (hook_type == "sessionStart" && hooks->on_session_start)
+    {
+        auto result = (*hooks->on_session_start)(input.get<SessionStartHookInput>(), invocation);
+        if (result)
+        {
+            json output;
+            to_json(output, *result);
+            return output;
+        }
+        return nullptr;
+    }
+    else if (hook_type == "sessionEnd" && hooks->on_session_end)
+    {
+        auto result = (*hooks->on_session_end)(input.get<SessionEndHookInput>(), invocation);
+        if (result)
+        {
+            json output;
+            to_json(output, *result);
+            return output;
+        }
+        return nullptr;
+    }
+    else if (hook_type == "errorOccurred" && hooks->on_error_occurred)
+    {
+        auto result = (*hooks->on_error_occurred)(input.get<ErrorOccurredHookInput>(), invocation);
+        if (result)
+        {
+            json output;
+            to_json(output, *result);
+            return output;
+        }
+        return nullptr;
+    }
+
+    return nullptr;
+}
+
+// =============================================================================
 // Lifecycle
 // =============================================================================
 
