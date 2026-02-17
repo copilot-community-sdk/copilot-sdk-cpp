@@ -121,7 +121,7 @@ if(COPILOT_WITH_FASTMCPP)
         message(STATUS "fastmcpp not found locally, fetching from GitHub...")
         include(FetchContent)
         set(COPILOT_FASTMCPP_GIT_TAG
-            "e590e3d63e89a412bd2a3f3527606a5da80bc2a0"
+            "97d9bc1f07bb591a76acdfd04461e6b56c50b20a"
             CACHE STRING
             "Git tag/commit for fastmcpp when fetched"
         )
